@@ -31,7 +31,10 @@ def masked_softmax(X, valid_len):
         # Fill masked elements with a large negative, whose exp is 0
         X = X.reshape(-1, shape[-1])
         for count, row in enumerate(X):
-            row[int(valid_len[count]):] = -1e6
+            try:
+                X[count][int(valid_len[count]):] = -1e6
+            except:
+                break
         return nn.functional.softmax(X.reshape(shape), dim=-1)
 
 

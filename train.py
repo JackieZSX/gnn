@@ -16,7 +16,8 @@ import numpy as np
 import pdb
 import os
 from dataset import GraphDataset
-from torch_geometric.data import DataLoader, DataListLoader
+#from torch_geometric.data import DataLoader, DataListLoader
+from torch_geometric.loader import DataLoader
 from utils.eval import get_eval_metric_results
 from tqdm import tqdm
 import torch_geometric.nn as nn
@@ -76,20 +77,28 @@ if __name__ == "__main__":
     # training envs
     np.random.seed(SEED)
     torch.manual_seed(SEED)
-    device = torch.device(f'cuda:{gpus[0]}' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     # prepare dara
     train_data = GraphDataset(TRAIN_DIR).shuffle()
     val_data = GraphDataset(VAL_DIR)
+    """
     if small_dataset:
         train_loader = DataListLoader(train_data[:1000], batch_size=batch_size, shuffle=True)
         val_loader = DataListLoader(val_data[:200], batch_size=batch_size)
     else:
         train_loader = DataListLoader(train_data, batch_size=batch_size, shuffle=True)
         val_loader = DataListLoader(val_data, batch_size=batch_size)
+    """
+    if small_dataset:
+        train_loader = DataLoader(train_data[:1000], batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_data[:200], batch_size=batch_size)
+    else:
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_data, batch_size=batch_size)
 
     model = HGNN(in_channels, out_channels)
-    model = nn.DataParallel(model, device_ids=gpus, output_device=gpus[0])
+    #model = nn.DataParallel(model, device_ids=gpus, output_device=gpus[0])
     model = model.to(device=device)
     
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -104,8 +113,11 @@ if __name__ == "__main__":
         num_samples = 0
         start_tic = time.time()
         for data in train_loader:
+            data.to(device)
             if epoch < end_epoch: break
-            y = torch.cat([i.y for i in data], 0).view(-1, out_channels).to(device)
+            #y = torch.cat([i.y for i in data], 0).view(-1, out_channels).to(device)
+            #print(data.y)
+            y = torch.cat([data.y], 0).view(-1, out_channels).to(device)
             optimizer.zero_grad()
             out = model(data)
             loss = F.mse_loss(out, y)
